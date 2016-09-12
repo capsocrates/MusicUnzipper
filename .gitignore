@@ -45,3 +45,13 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# project folders to ignore
+Debug
+Release
+x64
+.vs
+# project files to ignore
+*.db
+*.opendb
+*.user
