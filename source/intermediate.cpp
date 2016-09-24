@@ -16,19 +16,21 @@ enum class parse_state
     , READY
     , NEW
     , PROCESSED
+	, ERROR
 };
 
-auto is_zip_file(const fs::directory_entry& de) -> bool
+auto is_zip_file(const fs::path& de) -> bool
 {
-    return alg::iequals(de.path().extension().wstring(), L".zip");
+    return alg::iequals(de.extension().wstring(), L".zip");
 }
 
-auto read(const fs::path& directory_path, const std::string& extended_path, const std::wstring& intermediate_path) -> intermediate_data
+auto read(const fs::path& directory_path, const std::string& extended_path, const fs::path& intermediate_path) -> intermediate_data
 {
     auto ignored_files = std::set<fs::path>();
     auto parsed_filenames = rep_set();
     auto ready_files = rep_set();
     auto processed_files = rep_set();
+	auto errored_files = rep_set();
 
     auto explode = [&extended_path](fs::path path) -> representation
     {
@@ -36,7 +38,7 @@ auto read(const fs::path& directory_path, const std::string& extended_path, cons
     };
 
     {
-        auto infile = std::wifstream(intermediate_path, std::ios::binary);
+        auto infile = std::wifstream(intermediate_path.wstring(), std::ios::binary);
         auto current_line = std::wstring();
         auto state = parse_state::IGNORED;
 
@@ -56,7 +58,11 @@ auto read(const fs::path& directory_path, const std::string& extended_path, cons
                 {
                     state = parse_state::PROCESSED;
                 }
-                else if (current_line == ___PROCESSED)
+				else if (current_line == ___PROCESSED)
+				{
+					state = parse_state::ERROR;
+				}
+                else if (current_line == ___ERROR)
                 {
                     state = parse_state::NEW;
                 }
@@ -84,12 +90,18 @@ auto read(const fs::path& directory_path, const std::string& extended_path, cons
                         processed_files.insert(split_string_to_rep(current_line, extended_path));
                         break;
                     }
+					case parse_state::ERROR:
+					{
+						errored_files.insert(split_string_to_rep(current_line, extended_path));
+						break;
+					}
                     case parse_state::NEW:
                     {
                         const auto temp = split_string_to_rep(current_line, extended_path);
                         if (ignored_files.find(current_line) == ignored_files.end()
                             && ready_files.find(temp) == ready_files.end()
-                            && processed_files.find(temp) == processed_files.end())
+                            && processed_files.find(temp) == processed_files.end()
+							&& errored_files.find(temp) == errored_files.end())
                         {
                             parsed_filenames.insert(temp);
                         }
@@ -116,17 +128,24 @@ auto read(const fs::path& directory_path, const std::string& extended_path, cons
         return ignored_files.find(file) == ignored_files.end()
             && parsed_filenames.find(file.wstring()) == parsed_filenames.end()
             && ready_files.find(file.wstring()) == ready_files.end()
-            && processed_files.find(file.wstring()) == processed_files.end();
+            && processed_files.find(file.wstring()) == processed_files.end()
+			&& errored_files.find(file.wstring()) == errored_files.end();
     };
 
     auto get_new_zip_files = [&directory_path, is_new]() -> auto
     {
         return fs::directory_iterator(directory_path)
-            | ad::filtered([&](const fs::directory_entry& de)
+            | ad::filtered([&](const fs::directory_entry& de) -> bool
         {
-            return fs::is_regular_file(de) && is_zip_file(de) && is_new(de.path());
+			const auto nonrelative_path = fs::system_complete(de);
+            return fs::is_regular_file(nonrelative_path) && is_zip_file(nonrelative_path) && is_new(nonrelative_path);
         }
-        );
+        )
+			| ad::transformed([](const fs::directory_entry& de) -> fs::path
+		{
+			return fs::system_complete(de);
+		}
+		);
     };
 
     for (representation r : get_new_zip_files() | ad::transformed(explode))
@@ -139,15 +158,16 @@ auto read(const fs::path& directory_path, const std::string& extended_path, cons
         , std::move(parsed_filenames)
         , std::move(ready_files)
         , std::move(processed_files)
+		, std::move(errored_files)
     };
 }
 
 auto write(
-    const std::wstring& intermediate_path
+    const fs::path& intermediate_path
     , const intermediate_data& data
 ) -> void
 {
-    auto outfile = std::wofstream(intermediate_path);
+    auto outfile = std::wofstream(intermediate_path.wstring());
 
     boost::copy(
         data.ignored_files | ad::transformed([](const fs::path& p) -> const std::wstring&{return p.wstring();})
@@ -174,4 +194,11 @@ auto write(
     );
 
     outfile << ___PROCESSED << L"\n";
+
+	boost::copy(
+		data.errored_files
+		, std::ostream_iterator<representation, wchar_t>(outfile, L"\n")
+	);
+
+	outfile << ___ERROR << L"\n";
 }

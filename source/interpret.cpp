@@ -114,12 +114,10 @@ auto explode_path(const fs::path& path, const std::string& intermediate_path) ->
         throw std::runtime_error(std::string("bad filename!"));
     }
 
-    constexpr auto backslash = L"\\";
-
     return{path.wstring(), path.parent_path()
-        .append(intermediate_path).append(backslash)
-        .append(sanitize(trim(parts.front()))).append(backslash)
-        .append(sanitize(trim(parts.back()))).append(backslash)};
+		.append(intermediate_path)
+		.append(sanitize(trim(parts.front())))
+		.append(sanitize(trim(parts.back())))};
 }
 
 auto split_string_to_rep(const std::wstring& str, const std::string& intermediate_path) -> representation
