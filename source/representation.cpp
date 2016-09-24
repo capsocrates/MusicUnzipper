@@ -1,21 +1,25 @@
 #include "representation.h"
 
+#include <boost\algorithm\string\predicate.hpp>	//for ilexicographical_compare
+
 #include <iostream>
 #include <string>
 
+const auto locale = std::locale();	//not thread-safe
+
 auto rep_less::operator()(const representation& lhs, const representation& rhs) const -> bool
 {
-    return lhs.old_path < rhs.old_path;
+    return alg::ilexicographical_compare(lhs.old_path.wstring(), rhs.old_path.wstring(), locale);
 }
 
 auto rep_less::operator()(const std::wstring& lhs, const representation& rhs) const -> bool
 {
-    return lhs < rhs.old_path.wstring();
+	return alg::ilexicographical_compare(lhs, rhs.old_path.wstring(), locale);
 }
 
 auto rep_less::operator()(const representation& lhs, const std::wstring& rhs) const -> bool
 {
-    return lhs.old_path.wstring() < rhs;
+	return alg::ilexicographical_compare(lhs.old_path.wstring(), rhs, locale);
 }
 
 auto operator<<(std::wostream& os, const representation& r) -> std::wostream&

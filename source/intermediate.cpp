@@ -9,6 +9,8 @@
 #include <fstream>
 #include <iterator>
 
+const auto locale = std::locale();	//not thread-safe
+
 enum class parse_state
 {
     IGNORED
@@ -21,7 +23,7 @@ enum class parse_state
 
 auto is_zip_file(const fs::path& de) -> bool
 {
-    return alg::iequals(de.extension().wstring(), L".zip");
+    return alg::iequals(de.extension().wstring(), L".zip", locale);
 }
 
 auto read(const fs::path& directory_path, const std::string& extended_path, const fs::path& intermediate_path) -> intermediate_data

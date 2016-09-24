@@ -7,6 +7,8 @@
 #include <iostream>
 #include <string>
 
+const auto locale = std::locale();	//not thread-safe
+
 auto is_not_space(const wchar_t c) -> bool
 {
     return c != L' ' && c != L'_' && c != L'-';
@@ -47,9 +49,9 @@ auto maybe_capitalize(char_range str) -> void
     };
     for (const auto check : to_capitalize)
     {
-        if (alg::iequals(str, check))
+        if (alg::iequals(str, check, locale))
         {
-            alg::to_upper(str);
+            alg::to_upper(str, locale);
             return;
         }
     }
@@ -66,7 +68,7 @@ auto sanitize(sub_str str) -> sub_str
         if (last_char_was_space && !dash_or_underscore(c))
         {
             last_str = {&c, &c + 1};
-            alg::to_upper(last_str);
+            alg::to_upper(last_str, locale);
             last_char_was_space = false;
         }
         if (dash_or_underscore(c))
